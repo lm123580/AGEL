@@ -1,0 +1,20 @@
+roslaunch px4 mavros_posix_sitl.launch
+
+roslaunch px4 mavros_posix_sitl2.launch
+
+roslaunch px4 mavros_posix_sitl3.launch
+
+source ./devel/setup.bash && rosrun map_manager test_node
+
+source ./devel/setup.bash && rosrun bspline_util b_node
+
+source ./devel/setup.bash && rosrun test a_node
+
+source ./devel/setup.bash && rosrun system_fsm system_fsm_node
+
+mpstat -P ALL 1
+
+catkin_make -DCMAKE_BUILD_TYPE=Debug
+
+source ./devel/setup.bash &&  rosrun --prefix 'gdb -ex run --args' system_fsm system_fsm_node
+

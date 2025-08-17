@@ -1,0 +1,11 @@
+local_motion:
+  hover_ratio: 0.710
+  cost_w_lag: 30.0
+  cost_w_contour: 0.85
+  cost_w_progress: 8.00
+  cost_w_r_yaw: 0.50
+  cost_w_v_yaw: 2.00
+  cost_w_u_rate: 1.00
+  cost_w_u_trust: 30.0
+  cost_w_sfc: 3.00
+  cost_w_dynamic: 5.00

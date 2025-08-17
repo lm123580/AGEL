@@ -1,0 +1,6 @@
+astar:
+  resolution_astar: 0.4
+  lambda_heu: 1.0
+  max_search_time: 0.001
+  allocate_num: 1000000
+  

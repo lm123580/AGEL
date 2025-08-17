@@ -1,0 +1,3 @@
+map_manager:
+  frame_id: 'map'
+  map_ground_filter_hight: 0.4

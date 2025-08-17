@@ -1,0 +1,9 @@
+sdf_map:
+  resolution: 0.1
+  map_size_z: 2.0
+  ground_height: 0.4
+  map_size_x: 40.0
+  map_size_y: 40.0
+  map_size_z: 2.0
+  obstacles_inflation: 0.2
+  local_bound_inflate: 0.5

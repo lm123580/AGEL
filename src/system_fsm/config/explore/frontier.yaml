@@ -1,0 +1,9 @@
+frontier:
+  cluster_min: 5
+  cluster_size_xy: 1.5
+  w_distance: 1.0
+  w_rotation: 10.0
+  search:
+    short_time: 0.0005
+    long_time: 0.0500
+    distance: 7.50

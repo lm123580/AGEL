@@ -1,0 +1,4 @@
+# 忽略仓库目录
+/build/
+/devel/
+/.vscode/

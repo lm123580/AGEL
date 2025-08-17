@@ -1,0 +1,33 @@
+<launch>
+  <arg name="iris_pose" value="/gazebo/iris/pose"/>
+  <arg name="iris_vel" value="/gazebo/iris/vel"/>
+  <arg name="camera_depth" value="/d435i/depth/image_raw"/>
+
+  
+  
+  <!-- Load parameter for modules -->
+  <rosparam command="load" file="$(find system_fsm)/config/explore/frontier.yaml"/>
+
+  <rosparam command="load" file="$(find system_fsm)/config/motion/astar.yaml"/>
+  <rosparam command="load" file="$(find system_fsm)/config/motion/global_motion.yaml"/>
+  <rosparam command="load" file="$(find system_fsm)/config/motion/local_motion.yaml"/>
+  <rosparam command="load" file="$(find system_fsm)/config/motion/sfc.yaml"/>
+  
+  <rosparam command="load" file="$(find system_fsm)/config/perception/camera_util.yaml"/>
+  <rosparam command="load" file="$(find system_fsm)/config/perception/map_manager.yaml"/>
+  <rosparam command="load" file="$(find system_fsm)/config/perception/sdf_map.yaml"/>
+
+  <!-- Launch exploration node -->
+  <node pkg="system_fsm" name="system_fsm_node" type="system_fsm_node" output="screen">
+    <!-- VIO pose -->
+    <remap from ="/iris/pose" to="$(arg iris_pose)"/>
+    <remap from ="/iris/vel" to="$(arg iris_vel)"/>
+
+    <!-- Depth image -->
+    <remap from ="/camera/depth" to="$(arg camera_depth)"/>
+
+  </node>
+
+  <!-- Launch trajectory server -->
+  <node pkg="iris_truth_pose" name="iris_truth_pose" type="iris_truth_pose" output="screen" launch-prefix="gdb -ex run --args" />
+</launch>

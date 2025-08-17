@@ -1,0 +1,11 @@
+global_motion:
+  cost_w_smooth: 100.0
+  cost_w_arc: 100.0
+  cost_w_feasi: 50.0
+  cost_w_start: 20.0
+  cost_w_end: 20.0
+  max_vel: 1.00
+  max_acc: 0.50
+  max_iteration_num: 500
+  max_iteration_time: 0.005
+  bspline_degree: 3
