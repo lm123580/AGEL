@@ -12,42 +12,30 @@ namespace AGEL
 
     void SystemFSM::init(ros::NodeHandle& nh)
     {
-        nh.param("sdf_map/resolution", map_resolution_, 0.1);
-        nh.param("camera_util/max_dist", max_ray_length_, 5.0);
-
+        // 初始化参数
         nh.param("system_fsm/hover_height", hover_height_, 1.2);
-
-        max_ray_length_ = max_ray_length_ * 0.9;
 
         have_tarigger_ = false;
         have_unlock_ = false;
-
-        last_NBP_ = Eigen::Vector3d(1000000, 1000000, 1000000);
         
         state_ = STATE::UNLOCK;
-        motion_mode_ = MOTION_MODE::STATIC;
-
         waiting_pose_ = Eigen::Vector4d::Zero();
-        
-        px4_interface_.reset(new Px4Interface(nh));
-        map_manager_.reset(new MapManager());
-        motion_manager_.reset(new MotionManager());
-        explore_manager_.reset(new ExploreManager());
-        
+
+        px4_interface_.reset(new Px4Interface(nh));     // px4 控制接口
+        map_manager_.reset(new MapManager());           // 地图管理
+        motion_manager_.reset(new MotionManager());     // 运动管理
+        explore_manager_.reset(new ExploreManager());   // 探索管理
+
         map_manager_->init(nh);
         motion_manager_->init(nh, map_manager_, px4_interface_);
         explore_manager_->init(nh, map_manager_, px4_interface_);
 
         exec_fsm_timer_ = nh.createTimer(ros::Duration(0.020), &SystemFSM::execFSMCallback, this);
+
         finish_signal_pub_ = std::make_shared<ros::Publisher>(nh.advertise<std_msgs::Empty>("/explore/finish", 10));
-        
         target_sub_ = std::make_shared<ros::Subscriber>(nh.subscribe("/move_base_simple/goal", 5, &SystemFSM::targetCallback, this));
     
         start_time_ = ros::Time::now();
-
-        exploring_ = false;
-        rotation_pos_ << 0.0, 0.0, 0.0;
-        rotation_yaw_ = 0.0;
     }
 
 
@@ -60,7 +48,7 @@ namespace AGEL
 
         switch (state_)
         {
-        // 解锁无人机
+        // 未解锁状态
         case STATE::UNLOCK:
         {
             if (have_unlock_)
@@ -69,17 +57,17 @@ namespace AGEL
             }
             else
             {
+                // 解锁无人机
                 px4_interface_->set_px4_mode("AUTO.LOITER");
                 ros::Duration(0.1).sleep();
                 px4_interface_->arm();
                 ros::Duration(0.1).sleep();
 
+                // 设置悬停位置
                 double current_yaw;
                 Eigen::Vector3d current_pos;
-
                 current_yaw = px4_interface_->get_yaw();
                 current_pos = px4_interface_->get_pos();
-
                 waiting_pose_ << current_pos(0), current_pos(1), hover_height_, current_yaw; 
 
                 have_unlock_ = true;
@@ -91,30 +79,25 @@ namespace AGEL
         // 悬浮并等待
         case STATE::WAIT_TARIGGER:
         {
-            motion_mode_ = MOTION_MODE::HOVER;
-
-            if (have_tarigger_)
+            if (have_tarigger_) // 如果有触发，则进入运动模式 开始探索
             {
                 ROS_INFO("<<<<<===============START!!!==================>>>>>");
                 changeState(MOTION);
-                motion_mode_ = MOTION_MODE::ROTATION;
 
-                start_flag = true;
+                start_flag_ = true;
                 start_time_ = ros::Time::now();
             }
-            else
+            else                // 否则，保持悬停
             {
-                rotation_pos_ << waiting_pose_(0), waiting_pose_(1), waiting_pose_(2);
-
                 px4_interface_->set_pos(waiting_pose_(0), waiting_pose_(1), waiting_pose_(2), waiting_pose_(3));
             }
 
             break;            
         }
 
-        // 开始运动规划
         case STATE::MOTION:
         {
+            // 开始探索
             explore_manager_->run();
             
             break;
@@ -122,11 +105,11 @@ namespace AGEL
 
         case FINISH:
         {
-            if (start_flag == true)
+            if (start_flag_ == true)
             {
                 end_time_ = ros::Time::now();
 
-                start_flag = false;
+                start_flag_ = false;
             }
             ROS_INFO_THROTTLE(1.0, "<<<<<===============FINISH!!!==================>>>>>\nTOTAL TIME: %.2f S", (end_time_-start_time_).toSec());
             
@@ -135,11 +118,6 @@ namespace AGEL
                 have_tarigger_ = false;
             }
 
-            if (motion_mode_ != MOTION_MODE::HOVER)
-            {
-                motion_mode_ = MOTION_MODE::HOVER;
-            }
-            
             finish_signal_pub_->publish(std_msgs::Empty());
 
             double current_yaw;
@@ -164,64 +142,6 @@ namespace AGEL
         }
     }
 
-    Eigen::Vector3d SystemFSM::collisionDetection(Eigen::Vector3d &target_pos)
-    {
-        int sample_num = 5;
-        std::vector<bool> collision_flag;
-        std::vector<Eigen::Vector3d> sample_points, collision_points;
-
-        Eigen::Vector3d tmp_p;
-        for (int x = -sample_num; x < sample_num; x++)
-        {
-            for (int y = -sample_num; y < sample_num; y++)
-            {
-                tmp_p = Eigen::Vector3d(x * map_resolution_, y * map_resolution_, 0.0) + target_pos;
-                sample_points.push_back(tmp_p);
-            }
-        }
-
-        int sample_size = sample_points.size();
-        for (int i = 0; i < sample_size; i++)
-        {
-            tmp_p = sample_points[i];
-
-            if (map_manager_->map_->getInflateOccupancy(tmp_p))
-            {
-                collision_flag.push_back(true);
-                collision_points.push_back(tmp_p);
-            }
-            else
-            {
-                collision_flag.push_back(false);
-            }
-        }
-
-        if (collision_points.size() == 0)
-        {
-            return target_pos;
-        }
-
-        Eigen::Vector3d safe_pos;
-        double max_dist = -std::numeric_limits<double>::max();
-        for (int i = 0; i < sample_size; i++)
-        {
-            if (collision_flag[i])  continue ;
-
-            double tmp_dist = 0.0;
-            for (auto &cp: collision_points)
-            {
-                tmp_dist += (sample_points[i] - cp).squaredNorm();
-            }
-
-            if (tmp_dist > max_dist)
-            {
-                max_dist = tmp_dist;
-                safe_pos = sample_points[i];
-            }
-        }
-
-        return safe_pos;
-    }
 
     void SystemFSM::changeState(STATE state)
     {

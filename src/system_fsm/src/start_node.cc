@@ -13,17 +13,13 @@ int main(int argc, char **argv)
         ROS_WARN("Waiting for valid time...");
         ros::Duration(0.05).sleep(); 
     }
-    // cpu_set_t mask;
-    // CPU_ZERO(&mask);
-    // CPU_SET(8, &mask);
-    // pthread_setaffinity_np(pthread_self(), sizeof(mask), &mask);
-    
+
     AGEL::SystemFSM system_fsm;
     system_fsm.init(nh);
 
-    // ros::spin();
     ros::AsyncSpinner spinner(0);
     spinner.start();
+
     ros::waitForShutdown();
 
     return 0;
