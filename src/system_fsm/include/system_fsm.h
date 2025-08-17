@@ -51,8 +51,6 @@ namespace AGEL
         void controlCallback(const ros::TimerEvent& event);
         void targetCallback(const geometry_msgs::PoseStampedConstPtr& msg);
 
-        Eigen::Vector3d collisionDetection(Eigen::Vector3d &safe_pos);
-
     public:
         SystemFSM();
         

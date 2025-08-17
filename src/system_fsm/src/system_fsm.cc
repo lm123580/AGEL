@@ -130,7 +130,6 @@ namespace AGEL
                 current_pos = current_pos + current_vel * 0.05 * 0.5;
             }
             current_pos[2] = 1.2;
-            current_pos = collisionDetection(current_pos);
             px4_interface_->set_pos(current_pos(0), current_pos(1), current_pos(2), current_yaw);
 
             break;
