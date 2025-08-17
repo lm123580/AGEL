@@ -11,7 +11,7 @@
 #include <nlopt.hpp>
 #include <Eigen/Eigen>
 
-namespace xxx_xxx
+namespace AGEL
 {
     class BsplineOptimizer
     {

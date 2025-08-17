@@ -7,7 +7,7 @@ int main(int argc, char **argv)
     ros::init(argc, argv, "test_node");
     ros::NodeHandle nh("~");
 
-    xxx_xxx::MapManager mg;
+    AGEL::MapManager mg;
 
     mg.init(nh);
 

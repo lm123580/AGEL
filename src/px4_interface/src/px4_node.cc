@@ -5,7 +5,7 @@ int main(int argc, char **argv)
     ros::init(argc, argv, "b_node");
     ros::NodeHandle nh("~");
 
-    xxx_xxx::Px4Interface px4(nh);
+    AGEL::Px4Interface px4(nh);
 
     ros::Rate rate(50);
 

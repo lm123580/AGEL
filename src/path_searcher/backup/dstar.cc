@@ -1,7 +1,7 @@
 #include "sdf_map.h"
 #include "dstar.h"
 
-namespace xxx_xxx
+namespace AGEL
 {
     Dstar::Dstar(ros::NodeHandle &nh, const std::shared_ptr<SDFMap> &map)
     {

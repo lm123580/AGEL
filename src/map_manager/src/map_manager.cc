@@ -5,7 +5,7 @@
 #include "frontier.h"
 #include "kalman_filter.h"
 
-namespace xxx_xxx
+namespace AGEL
 {
     MapManager::MapManager() = default;
     MapManager::~MapManager() = default;

@@ -11,7 +11,7 @@
 
 #include "frontier.h"
 
-namespace xxx_xxx
+namespace AGEL
 {
     MotionManager::MotionManager() = default;
     

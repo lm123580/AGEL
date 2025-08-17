@@ -11,7 +11,7 @@
 #include <Eigen/Eigen>
 #include <chrono>
 
-namespace xxx_xxx
+namespace AGEL
 {
     class QuadrotorDynamic;
     class UniformBspline;

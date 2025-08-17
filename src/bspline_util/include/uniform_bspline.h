@@ -7,7 +7,7 @@
 #include <fstream>
 #include <string>
 
-namespace xxx_xxx
+namespace AGEL
 {
     class UniformBspline
     {

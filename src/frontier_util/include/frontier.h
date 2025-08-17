@@ -14,7 +14,7 @@
 #include <mutex>
 
 
-namespace xxx_xxx
+namespace AGEL
 {
     class SDFMap;
     class Astar;

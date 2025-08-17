@@ -5,7 +5,7 @@
 #include <vector>
 #include <Eigen/Eigen>
 
-namespace xxx_xxx
+namespace AGEL
 {
     #define PX 0
     #define PY 1

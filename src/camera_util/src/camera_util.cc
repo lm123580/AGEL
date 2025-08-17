@@ -1,6 +1,6 @@
 #include "camera_util.h"
 
-namespace xxx_xxx
+namespace AGEL
 {
     CameraUtil::CameraUtil(ros::NodeHandle &nh)
     {

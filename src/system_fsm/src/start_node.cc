@@ -18,7 +18,7 @@ int main(int argc, char **argv)
     // CPU_SET(8, &mask);
     // pthread_setaffinity_np(pthread_self(), sizeof(mask), &mask);
     
-    xxx_xxx::SystemFSM system_fsm;
+    AGEL::SystemFSM system_fsm;
     system_fsm.init(nh);
 
     // ros::spin();

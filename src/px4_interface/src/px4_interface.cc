@@ -1,6 +1,6 @@
 #include "px4_interface.h"
 
-namespace xxx_xxx
+namespace AGEL
 {
     Px4Interface::Px4Interface(ros::NodeHandle &nh)
     {

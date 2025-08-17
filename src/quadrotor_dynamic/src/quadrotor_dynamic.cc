@@ -1,6 +1,6 @@
 #include "quadrotor_dynamic.h"
 
-namespace xxx_xxx
+namespace AGEL
 {
     QuadrotorDynamic::QuadrotorDynamic() :
     hover_ratio_(0.710), aux(x_dim_), xdot1(x_dim_), xdot2(x_dim_), xdot3(x_dim_), xdot4(x_dim_)

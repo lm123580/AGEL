@@ -14,7 +14,7 @@
 
 class RayCaster;
 
-namespace xxx_xxx
+namespace AGEL
 {
     struct MapParam 
     {

@@ -2,7 +2,7 @@
 #include "uniform_bspline.h"
 #include "quadrotor_dynamic.h"
 
-namespace xxx_xxx
+namespace AGEL
 {
     MPCC::MPCC(std::shared_ptr<QuadrotorDynamic> &quadrotor_dynamic, 
                std::string algorithm, int maxeval, double maxtime):

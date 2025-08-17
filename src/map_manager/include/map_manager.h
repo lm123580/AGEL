@@ -23,7 +23,7 @@
 #include <random>
 
 
-namespace xxx_xxx
+namespace AGEL
 {
     class KalmanFilter;
     class CameraUtil;

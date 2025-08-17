@@ -5,7 +5,7 @@
 
 #include "obstacle_util.h"
 
-namespace xxx_xxx
+namespace AGEL
 {
     ObstacleUtil::ObstacleUtil() = default;
     ObstacleUtil::~ObstacleUtil() = default;

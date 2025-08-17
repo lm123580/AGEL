@@ -4,7 +4,7 @@
 #include <ros/ros.h>
 #include <Eigen/Eigen>
 
-namespace xxx_xxx
+namespace AGEL
 {
     class KalmanFilter
     {

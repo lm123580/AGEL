@@ -15,7 +15,7 @@
 #include <pcl/search/kdtree.h>
 
 
-namespace xxx_xxx
+namespace AGEL
 {
     class SDFMap;
     class CameraUtil;

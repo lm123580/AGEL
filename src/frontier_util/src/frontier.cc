@@ -3,7 +3,7 @@
 #include "frontier.h"
 
 
-namespace xxx_xxx
+namespace AGEL
 {
     Frontier::Frontier(ros::NodeHandle &nh, std::shared_ptr<SDFMap> map)
     {

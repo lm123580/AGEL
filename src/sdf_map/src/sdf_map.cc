@@ -1,7 +1,7 @@
 #include "raycast.h"
 #include "sdf_map.h"
 
-namespace xxx_xxx
+namespace AGEL
 {
     SDFMap::SDFMap() = default;
     SDFMap::~SDFMap() = default;

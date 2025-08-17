@@ -4,7 +4,7 @@
 #include "uniform_bspline.h"
 
 
-xxx_xxx::UniformBspline  b_spline;
+AGEL::UniformBspline  b_spline;
 
 visualization_msgs::Marker waypoints_mk, time_traj_mk, arc_traj_mk;
 ros::Publisher waypoints_pub_, time_traj_pub_, arc_traj_pub_;

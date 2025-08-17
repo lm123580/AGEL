@@ -1,7 +1,7 @@
 #include "sdf_map.h"
 #include "safe_flight_corridor.h"
 
-namespace xxx_xxx
+namespace AGEL
 {
     SFC::SFC(ros::NodeHandle &nh, const std::shared_ptr<SDFMap> &map)
     {

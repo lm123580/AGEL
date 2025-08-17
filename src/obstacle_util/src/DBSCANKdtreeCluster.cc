@@ -1,6 +1,6 @@
 #include "DBSCANKdtreeCluster.h"
 
-namespace xxx_xxx
+namespace AGEL
 {
     DBSCANKdtreeCluster::DBSCANKdtreeCluster()
     {

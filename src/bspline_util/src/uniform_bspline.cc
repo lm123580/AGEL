@@ -1,7 +1,7 @@
 #include "uniform_bspline.h"
 #include <chrono>
 
-namespace xxx_xxx
+namespace AGEL
 {
     UniformBspline::UniformBspline(const Eigen::MatrixXd &points, const int &degree, const double &interval) 
     {

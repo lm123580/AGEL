@@ -15,7 +15,7 @@
 
 #include <Eigen/Eigen>
 
-namespace xxx_xxx
+namespace AGEL
 {
     class SDFMap;
 

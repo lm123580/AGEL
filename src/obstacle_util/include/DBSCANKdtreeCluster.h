@@ -8,7 +8,7 @@
 #include <pcl/search/kdtree.h>
 #include <pcl/common/common.h>
 
-namespace xxx_xxx
+namespace AGEL
 {
     class DBSCANKdtreeCluster
     {

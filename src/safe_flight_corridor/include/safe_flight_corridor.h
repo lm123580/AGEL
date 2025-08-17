@@ -15,7 +15,7 @@
 #include <decomp_util/ellipsoid_decomp.h>
 #include <decomp_ros_utils/data_ros_utils.h>
 
-namespace xxx_xxx
+namespace AGEL
 {
     class SDFMap;
 

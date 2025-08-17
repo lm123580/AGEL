@@ -8,7 +8,7 @@ int main(int argc, char **argv)
     ros::NodeHandle nh("~");
 
 
-    xxx_xxx::QuadrotorDynamic qua(0.710);
+    AGEL::QuadrotorDynamic qua(0.710);
 
 
     Eigen::VectorXd x0(10), x1(10), x2(10), u(4);

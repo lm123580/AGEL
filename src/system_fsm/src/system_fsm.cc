@@ -5,7 +5,7 @@
 #include "motion_manager.h"
 #include "explore_manager.h"
 
-namespace xxx_xxx
+namespace AGEL
 {
     SystemFSM::SystemFSM() = default;
     SystemFSM::~SystemFSM() = default;

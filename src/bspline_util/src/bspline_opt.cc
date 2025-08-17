@@ -1,6 +1,6 @@
 #include "bspline_opt.h"
 
-namespace xxx_xxx
+namespace AGEL
 {
     BsplineOptimizer::BsplineOptimizer(ros::NodeHandle &nh) 
     {
