@@ -13,6 +13,7 @@ namespace AGEL
 
     void ExploreManager::init(ros::NodeHandle& nh, std::shared_ptr<MapManager> &map_manager, std::shared_ptr<Px4Interface> &px4_interface)
     {
+        nh.param("system_fsm/hover_height", hover_height_, 1.2);
         nh.param("camera_util/max_dist", max_ray_length_, 4.5);
         nh.param("explore_manager/delta_yaw", delta_yaw_, 0.19635);
 
@@ -23,19 +24,27 @@ namespace AGEL
 
         motion_manager_->init(nh, map_manager_, px4_interface_);
 
-        control_tiemr_ = nh.createTimer(ros::Duration(0.020), &ExploreManager::controlCallback,this);
+        control_tiemr_ = nh.createTimer(ros::Duration(0.030), &ExploreManager::controlCallback,this);
     }
 
 
     void ExploreManager::run()
     {
+        // 旋转采样 
+        double current_yaw;
+        Eigen::Vector3d current_pos;
+
+        current_pos = px4_interface_->get_pos();
+        current_pos[2] = hover_height_;
+        current_yaw = px4_interface_->get_yaw();
+
+        last_safe_position_ = collisionDetection(current_pos);
+
         switch (motion_mode_)
         {
         case MOTION_MODE::INIT:
         {
-            // 初始化
-            hovering_yaw_ = px4_interface_->get_yaw();
-            hovering_pose_ = px4_interface_->get_pos();
+            // 进入旋转状态
             change2Mode(MOTION_MODE::ROTATION);
 
             break;
@@ -43,21 +52,22 @@ namespace AGEL
 
         case MOTION_MODE::ROTATION:
         {
-            // 旋转采样
-            double current_yaw;
-            
-            hovering_pose_ = px4_interface_->get_pos();
-            hovering_pose_[2] = 1.20;
-            current_yaw = px4_interface_->get_yaw();
-            
-            getRotationDirection(hovering_pose_, current_yaw);
-            
-            if (rotation_direction_ == ROTATION_DIRECTION::NONE)
+            // 旋转采样 
+            double next_yaw;
+
+            next_yaw = getRotationDirection(last_safe_position_, current_yaw);
+
+            if (std::isinf(next_yaw))
             {
                 calc_nbp_start_ = false;
                 calc_nbp_ing_ = false;
                 hovering_yaw_ = current_yaw;
                 change2Mode(MOTION_MODE::HOVER);
+            }
+            else
+            {
+                // 旋转到下一个采样点
+                px4_interface_->set_pos(last_safe_position_[0], last_safe_position_[1], last_safe_position_[2], next_yaw);
             }
 
             break;
@@ -71,25 +81,12 @@ namespace AGEL
                 // 已经寻找完毕
                 if (!calc_nbp_ing_)
                 {
-                    getTargetFrontierInfo(target_frontier_point_, target_frontier_normal_);
-
                     if (getFrontiersNumber() == 0)
                     {
-                        Eigen::Vector3d current_pos = px4_interface_->get_pos();
-                        if (!map_manager_->map_->getInflateOccupancy(current_pos))
-                        {
-                            // 没有前沿点了，结束探索
-                            change2Mode(MOTION_MODE::FINISH);
-                        }
-                        else
-                        {
-                            // 没有前沿点了，重新寻找下一个目标前沿点
-                            calc_nbp_start_ = false;
-                            calc_nbp_ing_ = false;
-                        }
-                        
-                        return ;
+                        change2Mode(MOTION_MODE::FINISH);
                     }
+
+                    getTargetFrontierInfo(target_frontier_point_, target_frontier_normal_);
 
                     // 如果目标前沿在地图内
                     if (map_manager_->map_->isInMap(target_frontier_point_))
@@ -114,9 +111,11 @@ namespace AGEL
             {
                 calc_nbp_start_ = true;
                 calc_nbp_ing_ = true;
-                std::thread t_calc(&ExploreManager::calcNextTargetFrontier, this);
+                std::thread t_calc(&ExploreManager::calcNextTargetFrontier, this, last_safe_position_);
                 t_calc.detach();
             }
+
+            px4_interface_->set_pos(last_safe_position_[0], last_safe_position_[1], last_safe_position_[2], current_yaw);
 
             break;
         }
@@ -125,8 +124,6 @@ namespace AGEL
         {
             if (frontierExplored(target_frontier_point_, target_frontier_normal_))
             {
-                hovering_pose_ = px4_interface_->get_pos();
-                hovering_yaw_ = px4_interface_->get_yaw();
                 change2Mode(MOTION_MODE::ROTATION);
             }
             else
@@ -148,9 +145,6 @@ namespace AGEL
         case MOTION_MODE::FINISH:
         {
             // 结束探索
-            hovering_yaw_ = px4_interface_->get_yaw();
-            hovering_pose_ = px4_interface_->get_pos();
-
             ROS_INFO_THROTTLE(1.0, "<<<<<===============FINISH!!!==================>>>>>");
 
             break;
@@ -162,7 +156,7 @@ namespace AGEL
     }
 
 
-    void ExploreManager::getRotationDirection(Eigen::Vector3d& current_pos, double& current_yaw)
+    double ExploreManager::getRotationDirection(Eigen::Vector3d& current_pos, double& current_yaw)
     {
         auto &map = map_manager_->map_;
 
@@ -202,12 +196,7 @@ namespace AGEL
                 }
                 else if (sample_state == state_unknow)
                 {
-                    if (rotation_direction_ == ROTATION_DIRECTION::NONE)
-                    {
-                        rotation_direction_ = ROTATION_DIRECTION::CLOCKWISE;
-                    }
-
-                    return ;
+                    return sample_yaw + delta_yaw;
                 }
             }
 
@@ -229,12 +218,7 @@ namespace AGEL
                 }
                 else if (sample_state == state_unknow)
                 {
-                    if (rotation_direction_ == ROTATION_DIRECTION::NONE)
-                    {
-                        rotation_direction_ = ROTATION_DIRECTION::COUNTERCLOCKWISE;
-                    }
-
-                    return ;
+                    return sample_yaw + delta_yaw;
                 }
             }
 
@@ -242,13 +226,13 @@ namespace AGEL
             tmp_yaw += delta_yaw;
         }
 
-        rotation_direction_ = ROTATION_DIRECTION::NONE;
+        return std::numeric_limits<double>::infinity();
     }
 
 
     bool ExploreManager::frontierExplored(Eigen::Vector3d& point, Eigen::Vector2d& normal)
     {
-        if (point[0] > 1000)
+        if (std::isinf(point[0]))
         {
             return true;
         }
@@ -298,59 +282,17 @@ namespace AGEL
 
     void ExploreManager::controlCallback(const ros::TimerEvent &event)
     {
-
-        double height = 1.20;
         double current_yaw = px4_interface_->get_yaw();
-        Eigen::Vector3d current_pos = px4_interface_->get_pos();
-        current_pos[2] = height;
-        if (map_manager_->map_->getInflateOccupancy(current_pos))
-        {
-            current_pos = collisionDetection(current_pos);
-            hovering_pose_ = current_pos;
-            px4_interface_->set_pos(current_pos[0], current_pos[1], height, current_yaw);
-            return ;
-        }
 
-
-        switch (motion_mode_)
-        {
-        case MOTION_MODE::INIT:
-        {
-            return ;
-        }
-
-        case MOTION_MODE::ROTATION:
-        {
-            if (rotation_direction_ == ROTATION_DIRECTION::CLOCKWISE)
-            {
-                double yaw_rate = 1.57;
-                px4_interface_->set_pos_with_yaw_rate(hovering_pose_(0), hovering_pose_(1), hovering_pose_(2), yaw_rate);
-            }
-            else if (rotation_direction_ == ROTATION_DIRECTION::COUNTERCLOCKWISE)
-            {
-                double yaw_rate = -1.57;
-                px4_interface_->set_pos_with_yaw_rate(hovering_pose_(0), hovering_pose_(1), hovering_pose_(2), yaw_rate);
-            }
-
-            break;
-        }
-
-        case MOTION_MODE::HOVER:
-        {
-            px4_interface_->set_pos(hovering_pose_(0), hovering_pose_(1), hovering_pose_(2), hovering_yaw_);
-
-            break;
-        }
-
-        case MOTION_MODE::MOVING:
+        if (motion_mode_ == MOTION_MODE::MOVING)
         {
             if (last_is_rotation_)
             {
                 double start_yaw = motion_manager_->getGlobalStartYaw();
 
-                if (start_yaw > 100.0)
+                if (isinf(start_yaw))
                 {
-                    px4_interface_->set_pos(current_pos[0], current_pos[1], height, current_yaw);
+                    px4_interface_->set_pos(last_safe_position_[0], last_safe_position_[1], last_safe_position_[2], current_yaw);
 
                     return ;
                 }
@@ -363,7 +305,7 @@ namespace AGEL
 
                 if (diff_yaw > M_PI_4)
                 {
-                    px4_interface_->set_pos(current_pos[0], current_pos[1], current_pos[2], start_yaw);
+                    px4_interface_->set_pos(last_safe_position_[0], last_safe_position_[1], last_safe_position_[2], start_yaw);
                 }
                 else
                 {
@@ -377,25 +319,17 @@ namespace AGEL
                 motion_manager_->localPlanning();
                 mode_mutex_.unlock();
             }
-
-            break;
         }
-        default:
-            break;
-        }
-
-        if (motion_mode_ != MOTION_MODE::MOVING)
-        {
-            motion_manager_->visCleaner();
-        }
+        // if (motion_mode_ != MOTION_MODE::MOVING)
+        // {
+        //     motion_manager_->visCleaner();
+        // }
     }
+
     Eigen::Vector3d ExploreManager::collisionDetection(Eigen::Vector3d &target_pos)
     {
         int sample_num = 5;
         double map_resolution = map_manager_->map_->getResolution();
-
-        std::vector<Eigen::Vector3d> collision_points;
-        std::vector<Eigen::Vector3d> safe_points;
 
         for (int x = -sample_num; x < sample_num; ++x)
         {
@@ -403,111 +337,19 @@ namespace AGEL
             {
                 Eigen::Vector3d tmp_p = target_pos + Eigen::Vector3d(x * map_resolution, y * map_resolution, 0.0);
 
-                if (map_manager_->map_->getInflateOccupancy(tmp_p))
-                    collision_points.push_back(tmp_p);
-                else
-                    safe_points.push_back(tmp_p);
+                if (map_manager_->map_->getInflateOccupancy(tmp_p)) {
+                    return last_safe_position_; // 如果目标点本身就有碰撞，返回上次的安全位置
+                }
             }
         }
 
-        // 目标点本身安全，直接返回
-        if (collision_points.empty())
-            return target_pos;
-
-        // 没有安全点，返回原点或自定义异常处理
-        if (safe_points.empty())
-            return target_pos; // 或者 throw std::runtime_error("No safe point found!");
-
-        // 选离所有碰撞点最远的安全点
-        Eigen::Vector3d best_point = safe_points[0];
-        double max_dist = -std::numeric_limits<double>::max();
-        for (const auto& sp : safe_points)
-        {
-            double dist_sum = 0.0;
-            for (const auto& cp : collision_points)
-                dist_sum += (sp - cp).squaredNorm();
-
-            if (dist_sum > max_dist)
-            {
-                max_dist = dist_sum;
-                best_point = sp;
-            }
-        }
-
-        return best_point;
+        return target_pos; // 如果没有碰撞，返回原目标位置
     }
 
-    // Eigen::Vector3d ExploreManager::collisionDetection(Eigen::Vector3d &target_pos)
-    // {
-    //     int sample_num = 5;
-    //     std::vector<bool> collision_flag;
-    //     std::vector<Eigen::Vector3d> sample_points, collision_points;
+    void ExploreManager::calcNextTargetFrontier(Eigen::Vector3d start_pos)
+    {
+        map_manager_->frontier_->updateCost(start_pos, hovering_yaw_);
 
-    //     double map_resolution = map_manager_->map_->getResolution();
-
-    //     Eigen::Vector3d tmp_p;
-    //     for (int x = -sample_num; x < sample_num; x++)
-    //     {
-    //         for (int y = -sample_num; y < sample_num; y++)
-    //         {
-    //             tmp_p = Eigen::Vector3d(x * map_resolution, y * map_resolution, 0.0) + target_pos;
-    //             sample_points.push_back(tmp_p);
-    //         }
-    //     }
-
-    //     int sample_size = sample_points.size();
-    //     for (int i = 0; i < sample_size; i++)
-    //     {
-    //         tmp_p = sample_points[i];
-
-    //         if (map_manager_->map_->getInflateOccupancy(tmp_p))
-    //         {
-    //             collision_flag.push_back(true);
-    //             collision_points.push_back(tmp_p);
-    //         }
-    //         else
-    //         {
-    //             collision_flag.push_back(false);
-    //         }
-    //     }
-
-    //     if (collision_points.size() == 0)
-    //     {
-    //         return target_pos;
-    //     }
-
-    //     Eigen::Vector3d safe_pos;
-    //     double max_dist = -std::numeric_limits<double>::max();
-    //     for (int i = 0; i < sample_size; i++)
-    //     {
-    //         if (collision_flag[i])  continue ;
-
-    //         double tmp_dist = 0.0;
-    //         for (auto &cp: collision_points)
-    //         {
-    //             tmp_dist += (sample_points[i] - cp).squaredNorm();
-    //         }
-
-    //         if (tmp_dist > max_dist)
-    //         {
-    //             max_dist = tmp_dist;
-    //             safe_pos = sample_points[i];
-    //         }
-    //     }
-
-    //     return safe_pos;
-    // }
-
-
-    void ExploreManager::calcNextTargetFrontier()
-    {   
-        while (map_manager_->map_->getInflateOccupancy(hovering_pose_))
-        {
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
-        }
-        map_manager_->frontier_->updateCost(hovering_pose_, hovering_yaw_);
-
-        
         calc_nbp_ing_ = false;
     }
 

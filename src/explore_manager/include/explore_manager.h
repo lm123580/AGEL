@@ -55,13 +55,16 @@ namespace AGEL
         bool calc_nbp_start_{false};
 
         bool last_is_rotation_{true};
-        
+
         // 最大采样距离
         double max_ray_length_, delta_yaw_;
 
-        // 旋转或者悬停时的姿态
-        double hovering_yaw_;
+        // 盘旋时的姿态
+        double hovering_yaw_, hover_height_;
         Eigen::Vector3d hovering_pose_;
+
+        // 最后的安全位置
+        Eigen::Vector3d last_safe_position_;
 
         Eigen::Vector3d target_frontier_point_;
         Eigen::Vector2d target_frontier_normal_;
@@ -73,14 +76,14 @@ namespace AGEL
 
         void change2Mode(MOTION_MODE mode);
 
-        void getRotationDirection(Eigen::Vector3d& current_pos, double& current_yaw);
+        double getRotationDirection(Eigen::Vector3d& current_pos, double& current_yaw);
 
         bool frontierExplored(Eigen::Vector3d& point, Eigen::Vector2d& normal);
         
         Eigen::Vector3d collisionDetection(Eigen::Vector3d &target_pos);
 
-        void calcNextTargetFrontier();
-        
+        void calcNextTargetFrontier(Eigen::Vector3d start_pos);
+
         void getTargetFrontierInfo(Eigen::Vector3d &point, Eigen::Vector2d &normal);
         
         void controlCallback(const ros::TimerEvent &event);

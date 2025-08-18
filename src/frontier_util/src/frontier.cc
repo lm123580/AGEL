@@ -428,9 +428,10 @@ namespace AGEL
     void Frontier::updateCost(Eigen::Vector3d &start_pt, double start_yaw)
     {
         double min_cost = std::numeric_limits<double>::max();
-        
+
+        double inf = std::numeric_limits<double>::infinity();
         Eigen::Vector2d next_best_normal;
-        Eigen::Vector3d next_best_point(1000000, 10000000, 1000000);
+        Eigen::Vector3d next_best_point(inf, inf, inf);
 
         double sq_distance = search_distance_ * search_distance_;
         

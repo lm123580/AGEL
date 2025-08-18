@@ -93,7 +93,6 @@ namespace AGEL
             {
                 astar_->getPath(global_waypoints);
                 have_path = true;
-        std::cout << "22" << std::endl;
 
             }
             else
@@ -253,7 +252,7 @@ namespace AGEL
     {
         if (bspline_exec_ == nullptr)
         {
-            return 1000000.0;
+            return std::numeric_limits<double>::infinity();
         }
 
         // 获取B样条相关参数
