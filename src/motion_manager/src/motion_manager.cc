@@ -71,11 +71,6 @@ namespace AGEL
 
     bool MotionManager::globalPlanning(Eigen::Vector3d& goal, const bool is_replan)
     {
-        // ros::Time tt1 = ros::Time::now();
-        ros::Time t1, t2, t3, t4, t5, t6;
-
-        t1 = ros::Time::now();
-
         bool have_path = false;
 
         bool replan_flag = is_replan;
@@ -97,7 +92,7 @@ namespace AGEL
             }
             else
             {
-                std::cout << "First palnning: There is no path to goal" << std::endl;
+                std::cout << "First planning: There is no path to goal: " << goal.transpose() << std::endl;
             }
         }
         else
@@ -121,14 +116,6 @@ namespace AGEL
             }
         }
 
-        t2 = ros::Time::now();
-
-
-        std::cout << "Astar path size is: " << global_waypoints.size() << std::endl;
-        // ros::Time tt2 = ros::Time::now();
-
-        // std::cout << "astar time is: " << (tt2 - tt1).toSec() * 1000.0 << "ms" << std::endl;
-        
         if (!have_path)
         {
             arc_ts_ = 0.0;
@@ -148,8 +135,6 @@ namespace AGEL
             return false;
         }
         
-        // ros::Time t1 = ros::Time::now();
-
         // B样条拟合
         double res = 0.01;
         double rough_length = astar_->pathLength();
@@ -174,26 +159,18 @@ namespace AGEL
         bspline_->setUniformBspline(ctrl_pts, 3, dt);
         bspline_->getSamplePoints(time_bspline_waypoints_, res);
 
-        t3 = ros::Time::now();
-
-
         // B样条弧长参数化
         ctrl_pts = bspline_->getControlPoints();
         start_vel = (global_waypoints[1] - global_waypoints[0]).normalized();
         end_vel = (global_waypoints[astar_size - 1] - global_waypoints[astar_size - 2]).normalized();
         bspline_opt_->setBoundaryStates(start_pos, start_vel, start_acc, end_pos, end_vel, end_acc);
         bspline_opt_->solver(ctrl_pts, dt);
-        // ros::Time t2 = ros::Time::now();
-        // std::cout << "Bspline generate and opt time is : " << (t2 - t1).toSec() * 1000.0 << "ms" << std::endl;
-
-        t4 = ros::Time::now();
 
         // 缩短路径
         std::vector<Eigen::Vector3d> short_path;
         splitPath(global_waypoints, short_path);
 
         // 设置B样条
-        // bspline_->setUniformBspline(ctrl_pts, 3, dt);
         int short_ctrl_pts_num = short_path.size() + 3 - 1;
         Eigen::MatrixXd short_ctrl_pts = ctrl_pts.block(0, 0, short_ctrl_pts_num, ctrl_pts.cols());
         bspline_->setUniformBspline(short_ctrl_pts, 3, dt);
@@ -211,8 +188,6 @@ namespace AGEL
 
         global_waypoints_ = std::move(global_waypoints);
 
-        t5 = ros::Time::now();
-
         // 生成安全飞行走廊
         // ros::Time t3 = ros::Time::now();
         sfc_->generateSFC(short_path);
@@ -220,29 +195,9 @@ namespace AGEL
         sfc_->getCorridorPolys(corridor_polys_);
         sfc_->getpath2hPloyIdx(path2hPloy_idx_);
 
-        t6 = ros::Time::now();
-
         pubAstarTraj(global_waypoints_);
         pubReferTimeBspline(time_bspline_waypoints_);
         pubReferArcBspline(arc_bspline_waypoints_);
-        // ros::Time t4 = ros::Time::now();
-        // std::cout << "sfc time is : " << (t4 - t3).toSec() * 1000.0 << "ms" << std::endl;
-        // std::cout << "Total time is : " << (t4 - tt1).toSec() * 1000.0 << "ms" << std::endl;
-
-        search_path_info_.num++;
-        search_path_info_.total_time += ((t2 - t1).toSec() * 1000.0);            
-        global_opt_info_.num++;
-        global_opt_info_.total_time += ((t4 - t3).toSec() * 1000.0);  
-        sfc_info_.num++;
-        sfc_info_.total_time += ((t6 - t5).toSec() * 1000.0);
-
-        print_num_++;
-        if (print_num_ % 100 == 0) {
-            std::cout << "全局规划时间：" << (search_path_info_.total_time / search_path_info_.num) << std::endl;
-            std::cout << "全局优化时间：" << (global_opt_info_.total_time / global_opt_info_.num) << std::endl;
-            std::cout << "安全飞行走廊：" << (sfc_info_.total_time / sfc_info_.num) << std::endl;
-            print_num_ = 0;
-        }
 
         return true;
     }
@@ -276,7 +231,6 @@ namespace AGEL
             return ;
         }
         
-        // ros::Time local_start_time = ros::Time::now();
         // 获取B样条相关参数
         double arc_ts, arc_length;
         Eigen::MatrixXd ctrl_pts, v_ctrl_pts;
@@ -306,9 +260,6 @@ namespace AGEL
 
         mpcc_->set_w(cost_w_);
 
-        ros::Time t1, t2;
-
-        t1 = ros::Time::now();
         // 求解最优输入
         mpcc_->solver(state, 
                       ctrl_pts,
@@ -323,8 +274,6 @@ namespace AGEL
                       x_predict_,
                       t_index_);
         last_u_ = u_predict_.row(0);
-
-        t2 = ros::Time::now();
 
         // 发布控制指令
         px4_interface_->set_rate_with_trust(last_u_[0], last_u_[1], last_u_[2], last_u_[3]);
@@ -343,19 +292,7 @@ namespace AGEL
             predict_state_Q_.push_back(q);
         }
 
-        // ros::Time local_end_time = ros::Time::now();
-        // std::cout << "Total time is : " << (local_end_time - local_start_time).toSec() * 1000.0 << "ms" << std::endl;
-
         pubPredictState(predict_state_pos_, predict_state_Q_);
-
-        local_info_.num++;
-        local_info_.total_time += ((t2 - t1).toSec() * 1000.0);
-        print_num2_++;
-        if (print_num2_ % 100 == 0)
-        {
-            std::cout << "局部运动规划时间：" << (local_info_.total_time / local_info_.num) << std::endl;
-            print_num2_ = 0;
-        }
     }
 
 
@@ -372,12 +309,6 @@ namespace AGEL
             path_length += (path[i] - path[i-1]).norm();
             split_path.push_back(path[i]);
         }
-    }
-
-
-    void MotionManager::pathTimerCallback(const ros::TimerEvent& event)
-    {
-
     }
 
     void MotionManager::deleteMarkerArray(visualization_msgs::MarkerArray &mk_array)
@@ -578,14 +509,6 @@ namespace AGEL
 
         // 发布新的标记
         astar_pub_->publish(astar_traj_);
-    }
-
-
-    void MotionManager::visTimerCallback(const ros::TimerEvent& event)
-    {
-        if (global_waypoints_.size() > 0)           pubAstarTraj(global_waypoints_);
-        if (time_bspline_waypoints_.size() > 0)     pubReferTimeBspline(time_bspline_waypoints_);
-        if (arc_bspline_waypoints_.size() > 0)      pubReferArcBspline(arc_bspline_waypoints_);
     }
 
 

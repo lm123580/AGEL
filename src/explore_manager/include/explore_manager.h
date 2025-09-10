@@ -46,8 +46,6 @@ namespace AGEL
 
         MOTION_MODE motion_mode_{MOTION_MODE::INIT};
 
-        ROTATION_DIRECTION rotation_direction_{ROTATION_DIRECTION::NONE};
-
         // 正在寻找下一个最佳点
         bool calc_nbp_ing_{false};
 
@@ -59,9 +57,8 @@ namespace AGEL
         // 最大采样距离
         double max_ray_length_, delta_yaw_;
 
-        // 盘旋时的姿态
-        double hovering_yaw_, hover_height_;
-        Eigen::Vector3d hovering_pose_;
+        // 旋转方向
+        double rotation_direction_, hover_height_;
 
         // 最后的安全位置
         Eigen::Vector3d last_safe_position_;
@@ -78,11 +75,13 @@ namespace AGEL
 
         double getRotationDirection(Eigen::Vector3d& current_pos, double& current_yaw);
 
+        bool sampledUnknowArea(Eigen::Vector3d& current_pos, double sample_yaw);
+
         bool frontierExplored(Eigen::Vector3d& point, Eigen::Vector2d& normal);
         
         Eigen::Vector3d collisionDetection(Eigen::Vector3d &target_pos);
 
-        void calcNextTargetFrontier(Eigen::Vector3d start_pos);
+        void calcNextTargetFrontier(Eigen::Vector3d start_pos, double current_yaw);
 
         void getTargetFrontierInfo(Eigen::Vector3d &point, Eigen::Vector2d &normal);
         

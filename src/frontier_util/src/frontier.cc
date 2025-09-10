@@ -439,7 +439,7 @@ namespace AGEL
         // 1. 先初步搜索周围的前沿，时间短  附近的前沿会更新
         for (FIS &fis: frontiers_) 
         {
-            if ((fis.average - start_pt).squaredNorm() < sq_distance)
+            if (!map_->getInflateOccupancy(fis.average) && (fis.average - start_pt).squaredNorm() < sq_distance)
             {
                 fis.cost = computerCost(start_pt, start_yaw, fis.average, search_short_time_);
                 
@@ -464,6 +464,8 @@ namespace AGEL
         // 2. 如果周围不存在可更新的前沿，那么就可以放心搜索前沿
         for (FIS &fis: frontiers_) 
         {
+            if (map_->getInflateOccupancy(fis.average)) continue;
+            
             fis.cost = computerCost(start_pt, start_yaw, fis.average, search_long_time_);
             
             if (fis.cost < min_cost)
@@ -554,7 +556,6 @@ namespace AGEL
 
     double Frontier::calcDiffYaw(double &a, double &b)
     {
-            
         if (a - b > M_PI)       return (2 * M_PI - (a - b));
         else if (b - a > M_PI)  return (2 * M_PI - (b - a));
         else if (a > b)         return (a - b);

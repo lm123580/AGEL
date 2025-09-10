@@ -15,7 +15,9 @@ namespace AGEL
     {
         nh.param("system_fsm/hover_height", hover_height_, 1.2);
         nh.param("camera_util/max_dist", max_ray_length_, 4.5);
-        nh.param("explore_manager/delta_yaw", delta_yaw_, 0.19635);
+        nh.param("explore_manager/delta_yaw", delta_yaw_, M_PI / 32.0);
+
+        max_ray_length_ *= 0.9;
 
         map_manager_ = map_manager;
         px4_interface_ = px4_interface;
@@ -24,7 +26,7 @@ namespace AGEL
 
         motion_manager_->init(nh, map_manager_, px4_interface_);
 
-        control_tiemr_ = nh.createTimer(ros::Duration(0.030), &ExploreManager::controlCallback,this);
+        control_tiemr_ = nh.createTimer(ros::Duration(0.020), &ExploreManager::controlCallback,this);
     }
 
 
@@ -45,6 +47,8 @@ namespace AGEL
         case MOTION_MODE::INIT:
         {
             // 进入旋转状态
+            motion_manager_->visCleaner();
+            rotation_direction_ = getRotationDirection(last_safe_position_, current_yaw);
             change2Mode(MOTION_MODE::ROTATION);
 
             break;
@@ -53,20 +57,23 @@ namespace AGEL
         case MOTION_MODE::ROTATION:
         {
             // 旋转采样 
-            double next_yaw;
+            double next_direaction;
 
-            next_yaw = getRotationDirection(last_safe_position_, current_yaw);
+            next_direaction = getRotationDirection(last_safe_position_, current_yaw);
 
-            if (std::isinf(next_yaw))
+            if (next_direaction == 0)
             {
                 calc_nbp_start_ = false;
                 calc_nbp_ing_ = false;
-                hovering_yaw_ = current_yaw;
                 change2Mode(MOTION_MODE::HOVER);
             }
             else
             {
                 // 旋转到下一个采样点
+                double next_yaw = current_yaw;
+                if (next_direaction == 1) next_yaw += M_PI_4;
+                else next_yaw -= M_PI_4;
+
                 px4_interface_->set_pos(last_safe_position_[0], last_safe_position_[1], last_safe_position_[2], next_yaw);
             }
 
@@ -111,7 +118,7 @@ namespace AGEL
             {
                 calc_nbp_start_ = true;
                 calc_nbp_ing_ = true;
-                std::thread t_calc(&ExploreManager::calcNextTargetFrontier, this, last_safe_position_);
+                std::thread t_calc(&ExploreManager::calcNextTargetFrontier, this, last_safe_position_, current_yaw);
                 t_calc.detach();
             }
 
@@ -124,7 +131,7 @@ namespace AGEL
         {
             if (frontierExplored(target_frontier_point_, target_frontier_normal_))
             {
-                change2Mode(MOTION_MODE::ROTATION);
+                change2Mode(MOTION_MODE::INIT);
             }
             else
             {
@@ -132,9 +139,7 @@ namespace AGEL
                 mode_mutex_.lock();
                 if (!motion_manager_->globalPlanning(target_frontier_point_, replan))
                 {
-                    hovering_pose_ = px4_interface_->get_pos();
-                    hovering_yaw_ = px4_interface_->get_yaw();
-                    change2Mode(MOTION_MODE::ROTATION);
+                    change2Mode(MOTION_MODE::INIT);
                 }
                 mode_mutex_.unlock();
             }
@@ -156,77 +161,67 @@ namespace AGEL
     }
 
 
-    double ExploreManager::getRotationDirection(Eigen::Vector3d& current_pos, double& current_yaw)
+    // 辅助函数：在指定方向采样未知区域
+    bool ExploreManager::sampledUnknowArea(Eigen::Vector3d& current_pos, double sample_yaw)
     {
         auto &map = map_manager_->map_;
-
-        int sample_state, state_occupied, state_unknow;
-        state_occupied = map->OCCUPIED;
-        state_unknow   = map->UNKNOWN;
-
+        int state_occupied = map->OCCUPIED;
+        int state_unknow = map->UNKNOWN;
         double map_resolution = map->getResolution();
-
-        double delta_yaw, tmp_yaw, sample_yaw, delta_length;
-
-        delta_yaw = delta_yaw_;
-        delta_length = map_resolution * 0.5;
-
-        tmp_yaw = 0.0;
+        double delta_length = map_resolution * 0.5;
 
         Eigen::Vector2d sample_pos;
         Eigen::Vector2i sample_pos_idx;
 
+        // 对射线上的点采样
+        for (double length = map_resolution * 2; length < max_ray_length_; length += delta_length)
+        {
+            sample_pos[0] = current_pos[0] + length * std::cos(sample_yaw);
+            sample_pos[1] = current_pos[1] + length * std::sin(sample_yaw);
+            map->posToIndex(sample_pos, sample_pos_idx);
+
+            int sample_state = map->get2DState(sample_pos_idx);
+            if (sample_state == state_occupied)
+            {
+                break;
+            }
+            else if (sample_state == state_unknow)
+            {
+                return true; // 找到未知区域
+            }
+        }
+        
+        return false;
+    }
+
+    double ExploreManager::getRotationDirection(Eigen::Vector3d& current_pos, double& current_yaw)
+    {
+        double delta_yaw = delta_yaw_;
+        double tmp_yaw = 0.0;
+        double sample_yaw;
+
+        // 先完全采样右边所有角度 [0, PI]
         while (tmp_yaw < M_PI)
         {
-            // 采样右边的点
             sample_yaw = current_yaw + tmp_yaw;
-            if (sample_yaw > M_PI) sample_yaw = sample_yaw - (2 * M_PI);
-            
-            // 对射线上的点采样
-            for (double length = delta_length; length < max_ray_length_; length += delta_length)
-            {
-                sample_pos[0] = current_pos[0] + length * std::cos(sample_yaw);
-                sample_pos[1] = current_pos[1] + length * std::sin(sample_yaw);
-                map->posToIndex(sample_pos, sample_pos_idx);
+            // 角度归一化
+            while (sample_yaw > M_PI) sample_yaw -= 2 * M_PI;
+            while (sample_yaw < -M_PI) sample_yaw += 2 * M_PI;
 
-                sample_state = map->get2DState(sample_pos_idx);
-                if (sample_state == state_occupied)
-                {
-                    break;
-                }
-                else if (sample_state == state_unknow)
-                {
-                    return sample_yaw + delta_yaw;
-                }
-            }
+            if (sampledUnknowArea(current_pos, sample_yaw)) return 1;
 
-            // 采样左边的点
             sample_yaw = current_yaw - tmp_yaw;
-            if (sample_yaw < -M_PI) sample_yaw = sample_yaw + (2 * M_PI);
+            // 角度归一化
+            while (sample_yaw > M_PI) sample_yaw -= 2 * M_PI;
+            while (sample_yaw < -M_PI) sample_yaw += 2 * M_PI;
 
-            // 对射线上的点采样
-            for (double length = delta_length; length < max_ray_length_; length += delta_length)
-            {
-                sample_pos[0] = current_pos[0] + length * std::cos(sample_yaw);
-                sample_pos[1] = current_pos[1] + length * std::sin(sample_yaw);
-                map->posToIndex(sample_pos, sample_pos_idx);
-
-                sample_state = map->get2DState(sample_pos_idx);
-                if (sample_state == state_occupied)
-                {
-                    break;
-                }
-                else if (sample_state == state_unknow)
-                {
-                    return sample_yaw + delta_yaw;
-                }
-            }
+            if (sampledUnknowArea(current_pos, sample_yaw)) return -1;
 
             // 增量
             tmp_yaw += delta_yaw;
         }
 
-        return std::numeric_limits<double>::infinity();
+        return 0;
     }
 
 
@@ -320,10 +315,6 @@ namespace AGEL
                 mode_mutex_.unlock();
             }
         }
-        // if (motion_mode_ != MOTION_MODE::MOVING)
-        // {
-        //     motion_manager_->visCleaner();
-        // }
     }
 
     Eigen::Vector3d ExploreManager::collisionDetection(Eigen::Vector3d &target_pos)
@@ -346,9 +337,9 @@ namespace AGEL
         return target_pos; // 如果没有碰撞，返回原目标位置
     }
 
-    void ExploreManager::calcNextTargetFrontier(Eigen::Vector3d start_pos)
+    void ExploreManager::calcNextTargetFrontier(Eigen::Vector3d start_pos, double current_yaw)
     {
-        map_manager_->frontier_->updateCost(start_pos, hovering_yaw_);
+        map_manager_->frontier_->updateCost(start_pos, current_yaw);
 
         calc_nbp_ing_ = false;
     }
